@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GIS Web Application</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.polylinemeasure/Leaflet.PolylineMeasure.css" />
+    <!-- Leaflet Draw Plugin CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    
+
+    <style>
+        body { margin:0; padding:0; }
+        #map { height: 100vh; width: 100%; float: left; }
+        
+    </style>
+
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css" href="../static/general.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="navbar">
+            <button class="button" id="load-fuel-stations">Toggle Fuel Stations</button>
+            <button class="button" id="load-supermarkets">Toggle Supermarkets</button>
+            <button class="button" id="show-weather">Toggle Weather</button>
+            <button class="button" id="load-schools">Toggle Schools</button>
+        </div>
+        <div id="map"></div>
+        <div class="sidebar" id="sidebar">
+            <!-- Place to append location information -->
+        </div>
+    </div>
+
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- PolylineMeasure JS -->
+    <script src="https://unpkg.com/leaflet.polylinemeasure/Leaflet.PolylineMeasure.js"></script>
+    <!-- Leaflet Draw Plugin JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
+    
+    <script>
+        
+    
+        // Initialize the map
+        var map = L.map('map').setView([59.3293, 18.0686], 13); // Change to desired center and zoom level
+
+        // Load a tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Add the image overlay
+    var imageUrl = 'https://www.lib.utexas.edu/maps/historical/newark_nj_1922.jpg';  // Sample image URL, replace with your actual image URL
+    var imageBounds = [[59.325, 18.060], [59.340, 18.100]];  // Coordinates should tightly fit your image's location
+    L.imageOverlay(imageUrl, imageBounds).addTo(map);
+
+        // Add draw control
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        var drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            },
+            draw: {
+                polygon: true,
+                polyline: true,
+                rectangle: false,
+                circle: false,
+                circlemarker: false,
+                marker: true
+            }
+        });
+        map.addControl(drawControl);
+
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            var content = "<b>HEJZAN!</b><br><img src='https://content.imageresizer.com/images/memes/ugly-face-meme-2.jpg' alt='Feature Image' style='width:100px; height:auto;'>";
+            layer.bindPopup(content);
+            drawnItems.addLayer(layer);
+        });
+
+
+         // Polyline Measure
+        map.addControl(new L.Control.PolylineMeasure({
+            position: 'topleft',
+            unit: 'metres',
+            showBearings: true,
+            clearMeasurementsOnStop: true,
+            showClearControl: true,
+            showUnitControl: true
+        }));
+
+    var layers = {}; // Store references to toggleable layers
+
+    function toggleLayer(layerId, url, processFunction) {
+        if (layers[layerId]) {
+            map.removeLayer(layers[layerId]);
+            layers[layerId] = null;
+        } else {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    layers[layerId] = processFunction(data);
+                    layers[layerId].addTo(map);
+                });
+        }
+    }
+
+    document.getElementById('load-fuel-stations').addEventListener('click', function() {
+        toggleLayer('fuel', 'static/fuel.geojson', function(data) {
+            return L.geoJSON(data, {
+                onEachFeature: function (feature, layer) {
+                    layer.bindPopup(feature.properties.name);
+                }
+            });
+        });
+    });
+
+    document.getElementById('load-supermarkets').addEventListener('click', function() {
+        toggleLayer('supermarkets', 'static/supermarket.geojson', function(data) {
+            return L.geoJSON(data, {
+                onEachFeature: function (feature, layer) {
+                    var buffer = L.circle(layer.getLatLng(), {radius: 1000}).addTo(map);
+                    layer.bindPopup(feature.properties.name);
+                }
+            });
+        });
+    });
+
+    var pointsOfInterest = [
+            { name: "Vasamuseet", location: [59.3278, 18.0913], info: "Maritime museum in Stockholm." },
+            { name: "Moderna Museet", location: [59.3262, 18.0841], info: "Museum of modern art." },
+            { name: "Skansen", location: [59.3264, 18.1036], info: "Open-air museum and zoo." },
+            { name: "Kungliga Slottet", location: [59.3267, 18.0735], info: "The Royal Palace of Stockholm." },
+            { name: "Stadshuset", location: [59.3275, 18.0549], info: "Stockholm City Hall." }
+        ];
+
+        var sidebar = document.getElementById('sidebar');
+
+        pointsOfInterest.forEach(function(point) {
+            var marker = L.marker(point.location).addTo(map);
+            marker.bindPopup(`<b>${point.name}</b><br>${point.info}`);
+            marker.on('click', function() {
+                sidebar.style.display = 'block';
+                sidebar.innerHTML = `<h3>${point.name}</h3><p>${point.info}</p>`;
+            });
+        });
+
+        map.on('click', function() {
+            sidebar.style.display = 'none';  // Hide the sidebar when map is clicked
+        });
+</script>
+</body>
+</html>
