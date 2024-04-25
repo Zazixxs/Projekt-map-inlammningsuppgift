@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.polylinemeasure/Leaflet.PolylineMeasure.css" />
     <!-- Leaflet Draw Plugin CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.4.1/MarkerCluster.Default.css" />
+
     <!-- Turf.js for Geospatial Analysis -->
     <script src="https://unpkg.com/@turf/turf"></script>
     
@@ -57,6 +60,8 @@
     <!-- Leaflet Draw Plugin JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.4.1/leaflet.markercluster-src.js"></script>
+
     
     <script>
         
@@ -65,6 +70,8 @@
         var map = L.map('map').setView([59.3293, 18.0686], 13); // Change to desired center and zoom level
 
         var weatherLayer = L.layerGroup().addTo(map);
+        // var weatherLayer = L.markerClusterGroup();
+        // map.addLayer(weatherLayer);
 
         var schoolLayer = L.layerGroup().addTo(map);
 
@@ -302,22 +309,26 @@ function fetchDataAndVisualize() {
 
                 L.marker([lat, lon], {icon: tempIcon}).addTo(weatherLayer);
 
-                var weatherIconUrl;
-                if (type.includes("Regn")) {
-                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightrain-small.svg';
-                } else if (type.includes("Snö")) {
-                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightsnow-small.svg';
-                } else {
-                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/no-Precipitation-small.svg';
-                }
+var weatherIconUrl;
+if (type.includes("Regn")) {
+    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightrain-small.svg';
+} else if (type.includes("Snö")) {
+    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightsnow-small.svg';
+} else if (type.includes("Snöblandat regn")) {
+    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/moderatesleet-small.svg';
+}
 
-                var weatherIcon = L.icon({
-                    iconUrl: weatherIconUrl,
-                    iconSize: [38, 38],
-                    iconAnchor: [19, 38]
-                });
+if (weatherIconUrl) {  // Kontrollera om en URL har tilldelats
+    var weatherIcon = L.icon({
+        iconUrl: weatherIconUrl,
+        iconSize: [38, 38],
+        iconAnchor: [19, 38] // mitten av ikonen vid ikonens botten
+    });
 
-                L.marker([lat, lon], {icon: weatherIcon}).addTo(weatherLayer);
+    L.marker([lat, lon], {icon: weatherIcon}).addTo(weatherLayer);
+} else {
+    console.log('Ingen nederbörd, inga ikoner visas.');
+}
             });
         } else {
             console.log('No data received from the API');
