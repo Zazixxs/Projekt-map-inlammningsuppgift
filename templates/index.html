@@ -10,13 +10,27 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.polylinemeasure/Leaflet.PolylineMeasure.css" />
     <!-- Leaflet Draw Plugin CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <!-- Turf.js for Geospatial Analysis -->
+    <script src="https://unpkg.com/@turf/turf"></script>
     
 
     <style>
         body { margin:0; padding:0; }
         #map { height: 100vh; width: 100%; float: left; }
         
+        /* Anpassad stil för väderikoner */
+        .custom-div-icon {
+            background: rgba(255, 255, 255, 0.5); /* Lägger till lite genomskinlighet */
+            border: 1px solid #666;
+            border-radius: 2px;
+            padding: 2px;
+            font-size: 12px;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap; /* Hindrar texten från att brytas */
+        }
     </style>
+    
 
     <!-- CSS -->
     <link rel="stylesheet" type="text/css" href="../static/general.css" />
@@ -50,16 +64,81 @@
         // Initialize the map
         var map = L.map('map').setView([59.3293, 18.0686], 13); // Change to desired center and zoom level
 
+        var weatherLayer = L.layerGroup().addTo(map);
+
+        var schoolLayer = L.layerGroup().addTo(map);
+
         // Load a tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19
         }).addTo(map);
 
-        // Add the image overlay
-    var imageUrl = 'https://www.lib.utexas.edu/maps/historical/newark_nj_1922.jpg';  // Sample image URL, replace with your actual image URL
-    var imageBounds = [[59.325, 18.060], [59.340, 18.100]];  // Coordinates should tightly fit your image's location
+        
+
+
+        //TASK 3
+        var supermarketLayer = null; // Global variable to hold the layer
+
+    function toggleSupermarkets() {
+        if (supermarketLayer) {
+            map.removeLayer(supermarketLayer);
+            supermarketLayer = null;
+        } else {
+            fetch('static/supermarket.geojson')
+                .then(response => response.json())
+                .then(processSupermarkets);
+        }
+    }
+
+    function processSupermarkets(data) {
+        supermarketLayer = L.featureGroup().addTo(map);
+        var buffers = [];
+        data.features.forEach(function(feature) {
+            var buffer = turf.buffer(feature, 1, { units: 'kilometers' });
+            buffers.push(buffer);
+            L.geoJSON(buffer, {
+                style: function () {
+                    return { color: "#ff7800", weight: 1, opacity: 0.5, fillOpacity: 0.1 };
+                }
+            }).addTo(supermarketLayer);
+            L.geoJSON(feature).bindPopup(feature.properties.name).addTo(supermarketLayer);
+        });
+        highlightNonOverlapping(buffers);
+    }
+
+
+    function highlightNonOverlapping(buffers) {
+        var nonOverlapping = buffers.map(function(buffer, index, arr) {
+            var overlap = false;
+            arr.forEach(function(otherBuffer, otherIndex) {
+                if (index !== otherIndex && turf.intersect(buffer, otherBuffer)) {
+                    overlap = true;
+                }
+            });
+            return overlap ? null : buffer;
+        }).filter(Boolean);
+
+        nonOverlapping.forEach(function(buffer) {
+            L.geoJSON(buffer, {
+                style: function () {
+                    return { color: "#00ff00", weight: 2, opacity: 1, fillOpacity: 0.2 };
+                }
+            }).addTo(supermarketLayer);
+        });
+    }
+
+    document.getElementById('load-supermarkets').addEventListener('click', toggleSupermarkets);
+
+
+        //TASK 4
+        //Basemap overlay
+    var imageUrl = "./static/Skärmbild.jpg"
+    var imageBounds = [[59.33170087003419, 18.079330346714354 ], [59.318057681978175, 18.156903901688544]];  // Coordinates should tightly fit your image's location
     L.imageOverlay(imageUrl, imageBounds).addTo(map);
 
+
+
+    //TASK 1
         // Add draw control
         var drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
@@ -98,6 +177,8 @@
 
     var layers = {}; // Store references to toggleable layers
 
+
+    //TASK 3 - 4
     function toggleLayer(layerId, url, processFunction) {
         if (layers[layerId]) {
             map.removeLayer(layers[layerId]);
@@ -112,6 +193,7 @@
         }
     }
 
+    //TASK  5
     document.getElementById('load-fuel-stations').addEventListener('click', function() {
         toggleLayer('fuel', 'static/fuel.geojson', function(data) {
             return L.geoJSON(data, {
@@ -122,17 +204,8 @@
         });
     });
 
-    document.getElementById('load-supermarkets').addEventListener('click', function() {
-        toggleLayer('supermarkets', 'static/supermarket.geojson', function(data) {
-            return L.geoJSON(data, {
-                onEachFeature: function (feature, layer) {
-                    var buffer = L.circle(layer.getLatLng(), {radius: 1000}).addTo(map);
-                    layer.bindPopup(feature.properties.name);
-                }
-            });
-        });
-    });
 
+        //TASK 2
     var pointsOfInterest = [
             { name: "Vasamuseet", location: [59.3278, 18.0913], info: "Maritime museum in Stockholm." },
             { name: "Moderna Museet", location: [59.3262, 18.0841], info: "Museum of modern art." },
@@ -140,6 +213,7 @@
             { name: "Kungliga Slottet", location: [59.3267, 18.0735], info: "The Royal Palace of Stockholm." },
             { name: "Stadshuset", location: [59.3275, 18.0549], info: "Stockholm City Hall." }
         ];
+
 
         var sidebar = document.getElementById('sidebar');
 
@@ -155,6 +229,116 @@
         map.on('click', function() {
             sidebar.style.display = 'none';  // Hide the sidebar when map is clicked
         });
+
+        //TASK 7
+        // Event listener för att läsa in och visa skolor
+        document.getElementById('load-schools').addEventListener('click', loadAndDisplaySchools);
+
+        function loadAndDisplaySchools() {
+    // Om lagret redan har markörer, ta bort dem och avbryt funktionen
+    if (schoolLayer.getLayers().length > 0) {
+        schoolLayer.clearLayers();
+        return;  // Avbryter funktionen efter att ha tömt lagret
+    }
+
+    // Ladda skoldata och lägg till nya markörer om lagret är tomt
+    fetch('/api/schools')
+        .then(response => response.json())
+        .then(schools => {
+            schools.forEach(school => {
+                L.circleMarker([school.ycoord, school.xcoord], {
+                    color: getColor(school.cluster),
+                    fillColor: getColor(school.cluster),
+                    fillOpacity: 0.5,
+                    radius: 10
+                }).bindPopup(`School: ${school.Name}<br>Cluster: ${school.cluster}`)
+                .addTo(schoolLayer);  // Lägg till markören till schoolLayer istället för direkt till map
+            });
+        })
+        .catch(error => console.error('Error loading school data:', error));
+}
+
+        function getColor(cluster) {
+            const colors = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00'];
+            return colors[cluster % colors.length];
+        }
+
+        //TASK 6
+//TASK 6
+const apiKey = '2725faee05d642059a32a1c9855aae2d';
+const apiUrl = 'https://api.trafikinfo.trafikverket.se/v2/data.json';
+
+function fetchDataAndVisualize() {
+    const xmlRequest = `
+    <REQUEST>
+        <LOGIN authenticationkey="${apiKey}" />
+        <QUERY objecttype="WeatherStation" schemaversion="1">
+            <FILTER></FILTER>
+        </QUERY>
+    </REQUEST>`;
+
+    fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/xml' },
+        body: xmlRequest
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data && data.RESPONSE) {
+            weatherLayer.clearLayers(); // Rensa lagret innan nya data läggs till
+            data.RESPONSE.RESULT[0].WeatherStation.forEach(station => {
+                const coordinates = station.Geometry.WGS84.split(' ');
+                const lon = parseFloat(coordinates[1].slice(1));
+                const lat = parseFloat(coordinates[2].slice(0, -1));
+                const airTemp = station.Measurement.Air.Temp;
+                const type = station.Measurement.Precipitation.Type;
+
+                var tempIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div style="background-color: #fff; border: 1px solid #666; border-radius: 3px; padding: 2px;">${airTemp}°C</div>`,
+                    iconSize: [50, 20],
+                    iconAnchor: [25, 10]
+                });
+
+                L.marker([lat, lon], {icon: tempIcon}).addTo(weatherLayer);
+
+                var weatherIconUrl;
+                if (type.includes("Regn")) {
+                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightrain-small.svg';
+                } else if (type.includes("Snö")) {
+                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/lightsnow-small.svg';
+                } else {
+                    weatherIconUrl = 'https://www.trafikverket.se/Static/dist/images/map/road/icons/no-Precipitation-small.svg';
+                }
+
+                var weatherIcon = L.icon({
+                    iconUrl: weatherIconUrl,
+                    iconSize: [38, 38],
+                    iconAnchor: [19, 38]
+                });
+
+                L.marker([lat, lon], {icon: weatherIcon}).addTo(weatherLayer);
+            });
+        } else {
+            console.log('No data received from the API');
+        }
+    });
+}
+
+function toggleWeather() {
+    if (map.hasLayer(weatherLayer) && weatherLayer.getLayers().length > 0) {
+        weatherLayer.clearLayers();
+        map.removeLayer(weatherLayer);
+    } else {
+        map.addLayer(weatherLayer);
+        fetchDataAndVisualize();
+    }
+}
+
+document.getElementById('show-weather').addEventListener('click', toggleWeather);
+
+
+
 </script>
 </body>
 </html>

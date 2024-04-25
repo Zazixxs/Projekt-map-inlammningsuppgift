@@ -1,4 +1,6 @@
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, send_from_directory
+import pandas as pd
+from sklearn.cluster import KMeans
 
 # Setting up the Flask app
 app = Flask(__name__)
@@ -18,11 +20,18 @@ def serve_fuel_geojson():
 def serve_supermarket_geojson():
     return send_from_directory('static', 'supermarket.geojson')
 
-# Endpoint for serving 'schools.csv'
-@app.route('/csv/schools')
-def serve_schools_csv():
-    return send_from_directory('static', 'schools.csv')
-
+# Endpoint for serving clustered school data
+@app.route('/api/schools')
+def clustered_schools():
+    # Assuming the school locations CSV is stored under 'static/school_locations.csv'
+    data = pd.read_csv('static/school_locations.csv')
+    # Assume that the relevant columns are named 'ycoord' and 'xcoord'
+    kmeans = KMeans(n_clusters=5, random_state=0)
+    data['cluster'] = kmeans.fit_predict(data[['ycoord', 'xcoord']])
+    
+    # Convert clustered data to JSON
+    return jsonify(data.to_dict(orient='records'))
 
 if __name__ == "__main__":
     app.run(debug=True)
+
