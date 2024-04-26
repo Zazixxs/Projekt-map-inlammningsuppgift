@@ -52,3 +52,32 @@
     background-color: rgb(27, 199, 27);
 }
 
+
+
+body { margin:0; padding:0; }
+#map { height: 100vh; width: 100%; float: left; }
+
+/* Anpassad stil för väderikoner */
+.custom-div-icon {
+    background: rgba(255, 255, 255, 0.5); /* Lägger till lite genomskinlighet */
+    border: 1px solid #666;
+    border-radius: 2px;
+    padding: 2px;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap; /* Hindrar texten från att brytas */
+}
+
+.measure-button {
+    background-color: #fff;
+    border: none;
+    color: black;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+}
