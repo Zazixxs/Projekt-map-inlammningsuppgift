@@ -73,29 +73,40 @@
       //TASK 1
       // Add draw control
       var drawnItems = new L.FeatureGroup();
-      map.addLayer(drawnItems);
-      var drawControl = new L.Control.Draw({
-        edit: {
-          featureGroup: drawnItems,
-        },
-        draw: {
-          polygon: true,
-          polyline: true,
-          rectangle: false,
-          circle: false,
-          circlemarker: false,
-          marker: true,
-        },
-      });
-      map.addControl(drawControl);
+        map.addLayer(drawnItems);
+        var drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            },
+            draw: {
+                polygon: {
+                    allowIntersection: false,
+                    showArea: true
+                },
+                polyline: {
+                    metric: true
+                },
+                circlemarker: false
+            }
+        });
+        map.addControl(drawControl);
 
-      map.on(L.Draw.Event.CREATED, function (event) {
-        var layer = event.layer;
-        var content =
-          "<b>HEJZAN!</b><br><img src='https://content.imageresizer.com/images/memes/ugly-face-meme-2.jpg' alt='Feature Image' style='width:100px; height:auto;'>";
-        layer.bindPopup(content);
-        drawnItems.addLayer(layer);
-      });
+        map.on(L.Draw.Event.CREATED, function (event) {
+            var layer = event.layer;
+            var type = event.layerType;
+            var content = "";
+
+            if (type === 'marker') {
+                content = "<b>Point Location</b><br>Coordinates: " + layer.getLatLng().toString();
+            } else if (type === 'polyline') {
+                content = "<b>Line</b><br>Length: " + layer.getLength().toFixed(2) + " meters";
+            } else if (type === 'polygon') {
+                content = "<b>Polygon</b><br>Area: " + L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]).toFixed(2) + " square meters";
+            }
+
+            layer.bindPopup(content);
+            drawnItems.addLayer(layer);
+        });
 
       //TASK 2
     // Polyline Measure control initialization
