@@ -20,8 +20,14 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
     />
     <!-- Leaflet Markercluster CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"
+    />
 
     <!-- Cutsom CSS -->
     <link rel="stylesheet" type="text/css" href="../static/general.css" />
@@ -54,6 +60,9 @@
     <script src="https://unpkg.com/@turf/turf"></script>
     <script src="https://unpkg.com/leaflet.markercluster"></script>
 
+    <!-- Leaflet GeometryUtil -->
+    <script src="https://unpkg.com/leaflet-geometryutil/src/leaflet.geometryutil.js"></script>
+
     <script>
       // Initialize the map
       var map = L.map("map", {
@@ -73,109 +82,164 @@
       //TASK 1
       // Add draw control
       var drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
-        var drawControl = new L.Control.Draw({
-            edit: {
-                featureGroup: drawnItems
-            },
-            draw: {
-                polygon: {
-                    allowIntersection: false,
-                    showArea: true
-                },
-                polyline: {
-                    metric: true
-                },
-                circlemarker: false
-            }
+      map.addLayer(drawnItems);
+
+      var drawControl = new L.Control.Draw({
+        edit: {
+          featureGroup: drawnItems,
+        },
+        draw: {
+          polygon: {
+            showArea: true,
+            allowIntersection: false,
+          },
+          polyline: {
+            metric: true,
+          },
+          rectangle: {
+            showArea: true,
+          },
+          circle: {
+            showRadius: true,
+          },
+          circlemarker: false,
+          marker: true,
+        },
+      });
+      map.addControl(drawControl);
+
+      map.on(L.Draw.Event.CREATED, function (event) {
+        var layer = event.layer;
+        var content = "";
+        var type = event.layerType;
+
+        if (type === "marker") {
+          content = `<b>Marker</b><br>Coordinates: ${layer
+            .getLatLng()
+            .toString()}<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`;
+        } else if (type === "polyline") {
+          var length = L.GeometryUtil.length(layer);
+          content = `<b>Polyline</b><br>Length: ${length.toFixed(
+            2
+          )} meters<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`;
+        } else if (type === "polygon") {
+          var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+          content = `<b>Polygon</b><br>Area: ${(area / 1000000).toFixed(
+            2
+          )} square kilometers<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`;
+        } else if (type === "rectangle") {
+          var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+          content = `<b>Rectangle</b><br>Area: ${(area / 1000000).toFixed(
+            2
+          )} square kilometers<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`;
+        } else if (type === "circle") {
+          var radius = layer.getRadius();
+          content = `<b>Circle</b><br>Radius: ${radius.toFixed(
+            2
+          )} meters<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`;
+        }
+
+        layer.bindPopup(content);
+        drawnItems.addLayer(layer);
+      });
+
+      map.on(L.Draw.Event.EDITED, function (e) {
+        var layers = e.layers;
+        layers.eachLayer(function (layer) {
+          if (layer instanceof L.Polygon) {
+            var area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+            layer.setPopupContent(
+              `<b>Polygon</b><br>Area: ${(area / 1000000).toFixed(
+                2
+              )} square kilometers<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`
+            );
+          }
+          if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+            var length = L.GeometryUtil.length(layer);
+            layer.setPopupContent(
+              `<b>Polyline</b><br>Length: ${length.toFixed(
+                2
+              )} meters<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`
+            );
+          }
+          if (layer instanceof L.Circle) {
+            var radius = layer.getRadius();
+            layer.setPopupContent(
+              `<b>Circle</b><br>Radius: ${radius.toFixed(
+                2
+              )} meters<br><img src='https://placekitten.com/150/150' alt='Feature Image' style='width:100%; height:auto;'>`
+            );
+          }
         });
-        map.addControl(drawControl);
-
-        map.on(L.Draw.Event.CREATED, function (event) {
-            var layer = event.layer;
-            var type = event.layerType;
-            var content = "";
-
-            if (type === 'marker') {
-                content = "<b>Point Location</b><br>Coordinates: " + layer.getLatLng().toString();
-            } else if (type === 'polyline') {
-                content = "<b>Line</b><br>Length: " + layer.getLength().toFixed(2) + " meters";
-            } else if (type === 'polygon') {
-                content = "<b>Polygon</b><br>Area: " + L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]).toFixed(2) + " square meters";
-            }
-
-            layer.bindPopup(content);
-            drawnItems.addLayer(layer);
-        });
+      });
 
       //TASK 2
-    // Polyline Measure control initialization
-    var polylineMeasure = L.control.polylineMeasure({
-        position: 'topleft',
-        unit: 'metres',
+      // Polyline Measure control initialization
+      var polylineMeasure = L.control.polylineMeasure({
+        position: "topleft",
+        unit: "metres",
         showBearings: true,
         clearMeasurementsOnStop: false,
         showClearControl: true,
-        showUnitControl: true
-    });
-    polylineMeasure.addTo(map);
+        showUnitControl: true,
+      });
+      polylineMeasure.addTo(map);
 
-var pointsOfInterest = [
-{
-        name: "Skansen",
-        location: L.latLng(59.3264, 18.1036),
-        info: "Open-air museum and zoo."
-    },
-    {
-        name: "Vasamuseet",
-        location: L.latLng(59.3278, 18.0913),
-        info: "Maritime museum in Stockholm."
-    },
-    {
-        name: "Moderna Museet",
-        location: L.latLng(59.3262, 18.0841),
-        info: "Museum of modern art."
-    },
-    
-    {
-        name: "Kungliga Slottet",
-        location: L.latLng(59.3267, 18.0735),
-        info: "The Royal Palace of Stockholm."
-    },
-    {
-        name: "Stadshuset",
-        location: L.latLng(59.3275, 18.0549),
-        info: "Stockholm City Hall."
-    }
-];
+      var pointsOfInterest = [
+        {
+          name: "Skansen",
+          location: L.latLng(59.3264, 18.1036),
+          info: "Open-air museum and zoo.",
+        },
+        {
+          name: "Vasamuseet",
+          location: L.latLng(59.3278, 18.0913),
+          info: "Maritime museum in Stockholm.",
+        },
+        {
+          name: "Moderna Museet",
+          location: L.latLng(59.3262, 18.0841),
+          info: "Museum of modern art.",
+        },
 
-var sidebar = document.getElementById("sidebar");
+        {
+          name: "Kungliga Slottet",
+          location: L.latLng(59.3267, 18.0735),
+          info: "The Royal Palace of Stockholm.",
+        },
+        {
+          name: "Stadshuset",
+          location: L.latLng(59.3275, 18.0549),
+          info: "Stockholm City Hall.",
+        },
+      ];
 
-pointsOfInterest.forEach(function (point) {
-    var marker = L.marker(point.location).addTo(map);
-    marker.bindPopup(`<b>${point.name}</b><br>${point.info}`);
-    marker.on("click", function () {
-        sidebar.style.display = "block";
-        sidebar.innerHTML = `<h3>${point.name}</h3><p>${point.info}</p>`;
-    });
-});
+      var sidebar = document.getElementById("sidebar");
 
-// Extracting the locations for polylineMeasure.seed()
-var locations = pointsOfInterest.map(function(point) {
-    return point.location; // Changed from [point.location] to point.location
-});
+      pointsOfInterest.forEach(function (point) {
+        var marker = L.marker(point.location).addTo(map);
+        marker.bindPopup(`<b>${point.name}</b><br>${point.info}`);
+        marker.on("click", function () {
+          sidebar.style.display = "block";
+          sidebar.innerHTML = `<h3>${point.name}</h3><p>${point.info}</p>`;
+        });
+      });
 
-// Use the map's 'load' event to ensure layers are ready before drawing lines
-map.on('load', function() {
-    polylineMeasure.seed([locations]); // Changed from [locations] to locations
-}).fire('load');
+      // Extracting the locations for polylineMeasure.seed()
+      var locations = pointsOfInterest.map(function (point) {
+        return point.location; // Changed from [point.location] to point.location
+      });
 
-map.on("click", function () {
-    sidebar.style.display = "none"; // Hide the sidebar when map is clicked
-});
+      // Use the map's 'load' event to ensure layers are ready before drawing lines
+      map
+        .on("load", function () {
+          polylineMeasure.seed([locations]); // Changed from [locations] to locations
+        })
+        .fire("load");
 
-
-
+      map.on("click", function () {
+        sidebar.style.display = "none"; // Hide the sidebar when map is clicked
+      });
 
       //TASK 3
       var supermarketLayer = null;
@@ -247,15 +311,16 @@ map.on("click", function () {
 
       //TASK 3 - 4
       function toggleLayer(layerId, url, processFunction) {
+        // Check if the layer already exists
         if (layers[layerId]) {
-          map.removeLayer(layers[layerId]);
-          layers[layerId] = null;
+          map.removeLayer(layers[layerId]); // Remove the layer from the map
+          layers[layerId] = null; // Set the layer reference to null
         } else {
           fetch(url)
             .then((response) => response.json())
             .then((data) => {
-              layers[layerId] = processFunction(data);
-              layers[layerId].addTo(map);
+              layers[layerId] = processFunction(data); // Create the layer
+              layers[layerId].addTo(map); // Add the layer to the map
             });
         }
       }
@@ -270,28 +335,26 @@ map.on("click", function () {
       L.imageOverlay(imageUrl, imageBounds).addTo(map);
 
       //TASK  5
-      //Fueal Layer
-      document.getElementById("load-fuel-stations").addEventListener("click", function () {
-  toggleLayer("fuel", "static/fuel.geojson", function (data) {
-    // Create a new marker cluster group
-    var markers = L.markerClusterGroup();
-
-    // Add your geoJSON data to the marker cluster group
-    var geoJsonLayer = L.geoJSON(data, {
-      onEachFeature: function (feature, layer) {
-        layer.bindPopup(feature.properties.name);
-        markers.addLayer(layer); // add each layer to the marker cluster group
-      },
-    });
-
-    // Add the marker cluster group to your map
-    map.addLayer(markers);
-  });
-});
+      //Fuel Layer
+      document
+        .getElementById("load-fuel-stations")
+        .addEventListener("click", function () {
+          toggleLayer("fuel", "static/fuel.geojson", function (data) {
+            // Assuming data is in GeoJSON format
+            var markers = L.markerClusterGroup();
+            var geoJsonLayer = L.geoJSON(data, {
+              onEachFeature: function (feature, layer) {
+                layer.bindPopup(feature.properties.name);
+                markers.addLayer(layer);
+              },
+            });
+            return markers;
+          });
+        });
 
       //TASK 6
 
-      //Weather Layer   
+      //Weather Layer
       var weatherLayer = L.layerGroup().addTo(map);
       map.addLayer(weatherLayer);
 
