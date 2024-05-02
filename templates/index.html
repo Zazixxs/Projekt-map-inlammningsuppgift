@@ -35,6 +35,7 @@
   <body>
     <div class="container">
       <div class="navbar">
+        <button class="button" id="points-of-interest">Points of interest</button>
         <button class="button" id="load-fuel-stations">
           Toggle Fuel Stations
         </button>
@@ -173,6 +174,12 @@
         });
       });
 
+      document.getElementById("points-of-interest").addEventListener("click", () => {
+        
+        map.setView([59.3262, 18.0841], 13);
+
+      })
+
       //TASK 2
       // Polyline Measure control initialization
       var polylineMeasure = L.control.polylineMeasure({
@@ -227,18 +234,19 @@
 
       // Extracting the locations for polylineMeasure.seed()
       var locations = pointsOfInterest.map(function (point) {
-        return point.location; // Changed from [point.location] to point.location
+        return point.location; 
       });
 
-      // Use the map's 'load' event to ensure layers are ready before drawing lines
+
       map
         .on("load", function () {
-          polylineMeasure.seed([locations]); // Changed from [locations] to locations
+          polylineMeasure.seed([locations]); 
         })
         .fire("load");
 
       map.on("click", function () {
         sidebar.style.display = "none"; // Hide the sidebar when map is clicked
+        sidebar.innerHTML = "";
       });
 
       //TASK 3
@@ -340,7 +348,6 @@
         .getElementById("load-fuel-stations")
         .addEventListener("click", function () {
           toggleLayer("fuel", "static/fuel.geojson", function (data) {
-            // Assuming data is in GeoJSON format
             var markers = L.markerClusterGroup();
             var geoJsonLayer = L.geoJSON(data, {
               onEachFeature: function (feature, layer) {
@@ -353,8 +360,6 @@
         });
 
       //TASK 6
-
-      //Weather Layer
       var weatherLayer = L.layerGroup().addTo(map);
       map.addLayer(weatherLayer);
 
@@ -362,85 +367,117 @@
       const apiKey = "2725faee05d642059a32a1c9855aae2d";
       const apiUrl = "https://api.trafikinfo.trafikverket.se/v2/data.json";
 
-      function fetchDataAndVisualize() {
+      
+
+      function fetchDataAndVisualize(cityNumber) {
         const xmlRequest = `
-        <REQUEST>
+          <REQUEST>
             <LOGIN authenticationkey="${apiKey}" />
             <QUERY objecttype="WeatherStation" schemaversion="1">
-                <FILTER></FILTER>
+              <FILTER>
+                <EQ name="CountyNo" value="${cityNumber}" />
+              </FILTER>
             </QUERY>
-        </REQUEST>`;
+          </REQUEST>`;
 
-        fetch(apiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/xml" },
-          body: xmlRequest,
-        })
+        var setAirTemp = [];
+        var getNormalizedAirTemp;
+
+        return new Promise((resolve, reject) => {
+          fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/xml" },
+            body: xmlRequest,
+          })
           .then((response) => response.json())
           .then((data) => {
-            if (data && data.RESPONSE) {
-              weatherLayer.clearLayers();
+            console.log("Received data:", data);
+
+            if (data && data.RESPONSE && data.RESPONSE.RESULT && data.RESPONSE.RESULT[0].WeatherStation) {
               data.RESPONSE.RESULT[0].WeatherStation.forEach((station) => {
-                const coordinates = station.Geometry.WGS84.split(" ");
-                const lon = parseFloat(coordinates[1].slice(1));
-                const lat = parseFloat(coordinates[2].slice(0, -1));
-                const airTemp = station.Measurement.Air.Temp;
-                const type = station.Measurement.Precipitation.Type;
-
-                var tempIcon = L.divIcon({
-                  className: "custom-div-icon",
-                  html: `<div style="background-color: #fff; border: 1px solid #666; border-radius: 3px; padding: 2px;">${airTemp}°C</div>`,
-                  iconSize: [50, 20],
-                  iconAnchor: [25, 10],
-                });
-
-                L.marker([lat, lon], { icon: tempIcon }).addTo(weatherLayer);
-
-                var weatherIconUrl;
-                if (type.includes("Regn")) {
-                  weatherIconUrl =
-                    "https://www.trafikverket.se/Static/dist/images/map/road/icons/lightrain-small.svg";
-                } else if (type.includes("Snö")) {
-                  weatherIconUrl =
-                    "https://www.trafikverket.se/Static/dist/images/map/road/icons/lightsnow-small.svg";
-                } else if (type.includes("Snöblandat regn")) {
-                  weatherIconUrl =
-                    "https://www.trafikverket.se/Static/dist/images/map/road/icons/moderatesleet-small.svg";
-                }
-
-                if (weatherIconUrl) {
-                  var weatherIcon = L.icon({
-                    iconUrl: weatherIconUrl,
-                    iconSize: [38, 38],
-                    iconAnchor: [19, 38],
-                  });
-
-                  L.marker([lat, lon], { icon: weatherIcon }).addTo(
-                    weatherLayer
-                  );
+                if (station.Measurement && station.Measurement.Air && station.Measurement.Air.Temp) {
+                  const airTemp = station.Measurement.Air.Temp;
+                  setAirTemp.push(airTemp);
                 } else {
-                  console.log("Ingen nederbörd, inga ikoner visas.");
+                  console.warn("Missing or incomplete data for station:", station);
                 }
               });
+
+              getNormalizedAirTemp = setAirTemp.reduce((acc, currentAirTemp) => acc + currentAirTemp, 0);
+              getNormalizedAirTemp /= setAirTemp.length;
+              getNormalizedAirTemp = getNormalizedAirTemp.toFixed(2);
+
+              console.log("Average Air Temperature:", getNormalizedAirTemp);
+              resolve(getNormalizedAirTemp); // Resolve the promise with getNormalizedAirTemp
             } else {
               console.log("No data received from the API");
+              reject(new Error("No data received from the API"));
             }
+          })
+          .catch((error) => {
+            console.error("Error fetching or parsing data:", error);
+            reject(error);
           });
+        });
       }
+
+      const cities = ["Stockholm", "Uppsala", "Göteborg", "Falun", "Luleå"];
+
+      let cordinat = new Map();
+
+      cordinat.set("Stockholm", { lat: 59.3293, lng: 18.0686 });
+      cordinat.set("Uppsala", { lat: 59.8586, lng: 17.6389 });
+      cordinat.set("Göteborg", { lat: 57.7089, lng: 11.9746 });
+      cordinat.set("Falun", { lat: 60.6036, lng: 15.6254 });
+      cordinat.set("Luleå", { lat: 65.5842, lng: 22.1547 });
+
+      let regions = new Map();
+
+      regions.set("Stockholm", 1);
+      regions.set("Uppsala", 3);
+      regions.set("Göteborg", 14);
+      regions.set("Falun", 20);
+      regions.set("Luleå", 25);
+
+      function getAverageTemperature()
+      {
+        sidebar.style.display = "block";
+        
+        for(const city of cities)
+        {
+          var temperature = 0;
+          fetchDataAndVisualize(regions.get(city))
+          .then((getNormalizedAirTemp) => {
+            console.log("Average Air Temperature:", getNormalizedAirTemp);
+            L.marker([cordinat.get(city).lat, cordinat.get(city).lng])
+            .addTo(weatherLayer) 
+            .bindPopup(`Average temperature in ${city}: ${getNormalizedAirTemp}°C`);
+            sidebar.innerHTML += `<h3>${city}</h3><p>${getNormalizedAirTemp}°C</p>`;
+          })
+          .catch((error) => {
+            console.error("Error fetching or visualizing data:", error);
+          });
+        }
+      }
+
+      
 
       function toggleWeather() {
         if (map.hasLayer(weatherLayer) && weatherLayer.getLayers().length > 0) {
           weatherLayer.clearLayers();
           map.removeLayer(weatherLayer);
+          sidebar.style.display = "none";
+          sidebar.innerHTML = "";
         } else {
           map.addLayer(weatherLayer);
-          fetchDataAndVisualize();
+          getAverageTemperature();
         }
       }
 
       document
         .getElementById("show-weather")
         .addEventListener("click", toggleWeather);
+
 
       //TASK 7
 
@@ -454,10 +491,9 @@
         // Om lagret redan har markörer, ta bort dem och avbryt funktionen
         if (schoolLayer.getLayers().length > 0) {
           schoolLayer.clearLayers();
-          return; // Avbryter funktionen efter att ha tömt lagret
+          return;
         }
 
-        // Ladda skoldata och lägg till nya markörer om lagret är tomt
         fetch("/api/schools")
           .then((response) => response.json())
           .then((schools) => {
@@ -471,7 +507,7 @@
                 .bindPopup(
                   `School: ${school.Name}<br>Cluster: ${school.cluster}`
                 )
-                .addTo(schoolLayer); // Lägg till markören till schoolLayer istället för direkt till map
+                .addTo(schoolLayer);
             });
           })
           .catch((error) => console.error("Error loading school data:", error));
